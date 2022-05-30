@@ -1,0 +1,347 @@
+---
+title: "713 Final Project"
+author: "Huiyue Li"
+
+output: html_document
+---
+
+```{r setup, include=FALSE,eval=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = F,message = F,eval = F)
+```
+
+### Descriptive data analysis
+```{r eval=FALSE}
+#load package
+library(tidyverse)
+library(patchwork)
+library(MASS)
+library(survival)
+library(survminer)
+```
+
+```{r eval=FALSE}
+#load data
+pbc=read.table("pbc.txt")
+colnames(pbc)=c("id","time","status","trt","age","sex","ascites","hepato","spiders","edema","bili","chol","albumin","copper","alk.phos","ast","trig","platelet","protime","stage")
+```
+
+```{r eval=FALSE}
+pbc1=pbc%>%na.omit()#36 obs
+colSums(is.na(pbc))[colSums(is.na(pbc))>0] #explore the NA distribution
+count=nrow(pbc1)
+# age
+pbc_age1=pbc1%>%summarise(mean=mean(age),sd=sd(age))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_age2=pbc1%>%group_by(trt)%>%summarise(mean=mean(age),sd=sd(age))
+pbc_age=rbind(pbc_age1,pbc_age2)
+# sex
+pbc_sex1=pbc1%>%group_by(sex)%>%summarise(n=n())%>%mutate(trt="All",prop=round(n/count,2))%>%dplyr::select(trt,sex,n,prop)
+pbc_sex2=pbc1%>%group_by(trt,sex)%>%summarise(n=n())%>%mutate(prop=if_else(trt==1,round(n/136,2),round(n/140,2)))
+pbc_sex2$trt=as.character(pbc_sex2$trt)
+pbc_sex=full_join(pbc_sex1,pbc_sex2)
+# ascites
+pbc_asc1=pbc1%>%group_by(ascites)%>%summarise(n=n())%>%mutate(trt="All",prop=round(n/count,2))%>%dplyr::select(trt,ascites,n,prop)
+pbc_asc2=pbc1%>%group_by(trt,ascites)%>%summarise(n=n())%>%mutate(prop=if_else(trt==1,round(n/136,2),round(n/140,2)))
+pbc_asc2$trt=as.character(pbc_asc2$trt)
+pbc_asc=full_join(pbc_asc1,pbc_asc2)
+#hepato
+pbc_hep1=pbc1%>%group_by(hepato)%>%summarise(n=n())%>%mutate(trt="All",prop=round(n/count,2))%>%dplyr::select(trt,hepato,n,prop)
+pbc_hep2=pbc1%>%group_by(trt,hepato)%>%summarise(n=n())%>%mutate(prop=if_else(trt==1,round(n/136,2),round(n/140,2)))
+pbc_hep2$trt=as.character(pbc_hep2$trt)
+pbc_hep=full_join(pbc_hep1,pbc_hep2)
+#spiders
+pbc_spi1=pbc1%>%group_by(spiders)%>%summarise(n=n())%>%mutate(trt="All",prop=round(n/count,2))%>%dplyr::select(trt,spiders,n,prop)
+pbc_spi2=pbc1%>%group_by(trt,spiders)%>%summarise(n=n())%>%mutate(prop=if_else(trt==1,round(n/136,2),round(n/140,2)))
+pbc_spi2$trt=as.character(pbc_spi2$trt)
+pbc_spi=full_join(pbc_spi1,pbc_spi2)
+#edema
+pbc1$edema=as.factor(pbc1$edema)
+pbc_ede1=pbc1%>%group_by(edema)%>%summarise(n=n())%>%mutate(trt="All",prop=round(n/count,2))%>%dplyr::select(trt,edema,n,prop)
+pbc_ede2=pbc1%>%group_by(trt,edema)%>%summarise(n=n())%>%mutate(prop=if_else(trt==1,round(n/136,2),round(n/140,2)))
+pbc_ede2$trt=as.character(pbc_ede2$trt)
+pbc_ede=full_join(pbc_ede1,pbc_ede2)
+#stage
+pbc1$stage=as.factor(pbc1$stage)
+pbc_sta1=pbc1%>%group_by(stage)%>%summarise(n=n())%>%mutate(trt="All",prop=round(n/count,2))%>%dplyr::select(trt,stage,n,prop)
+pbc_sta2=pbc1%>%group_by(trt,stage)%>%summarise(n=n())%>%mutate(prop=if_else(trt==1,round(n/136,2),round(n/140,2)))
+pbc_sta2$trt=as.character(pbc_sta2$trt)
+pbc_sta=full_join(pbc_sta1,pbc_sta2)
+pbc_factor=bind_rows(pbc_sex,pbc_asc,pbc_hep,pbc_spi,pbc_ede,pbc_sta)
+#bili
+pbc_bil1=pbc1%>%summarise(mean=mean(bili),sd=sd(bili))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_bil2=pbc1%>%group_by(trt)%>%summarise(mean=mean(bili),sd=sd(bili))
+pbc_bil=rbind(pbc_bil1,pbc_bil2)
+#chol
+pbc_cho1=pbc1%>%summarise(mean=mean(chol),sd=sd(chol))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_cho2=pbc1%>%group_by(trt)%>%summarise(mean=mean(chol),sd=sd(chol))
+pbc_cho=rbind(pbc_cho1,pbc_cho2)
+#albumin
+pbc_alb1=pbc1%>%summarise(mean=mean(albumin),sd=sd(albumin))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_alb2=pbc1%>%group_by(trt)%>%summarise(mean=mean(albumin),sd=sd(albumin))
+pbc_alb=rbind(pbc_alb1,pbc_alb2)
+#copper
+pbc_cop1=pbc1%>%summarise(mean=mean(copper),sd=sd(copper))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_cop2=pbc1%>%group_by(trt)%>%summarise(mean=mean(copper),sd=sd(copper))
+pbc_cop=rbind(pbc_cop1,pbc_cop2)
+#alk.phos
+pbc_alk1=pbc1%>%summarise(mean=mean(alk.phos),sd=sd(alk.phos))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_alk2=pbc1%>%group_by(trt)%>%summarise(mean=mean(alk.phos),sd=sd(alk.phos))
+pbc_alk=rbind(pbc_alk1,pbc_alk2)
+#ast
+pbc_ast1=pbc1%>%summarise(mean=mean(ast),sd=sd(ast))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_ast2=pbc1%>%group_by(trt)%>%summarise(mean=mean(ast),sd=sd(ast))
+pbc_ast=rbind(pbc_ast1,pbc_ast2)
+#trig
+pbc_tri1=pbc1%>%summarise(mean=mean(trig),sd=sd(trig))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_tri2=pbc1%>%group_by(trt)%>%summarise(mean=mean(trig),sd=sd(trig))
+pbc_tri=rbind(pbc_tri1,pbc_tri2)
+#platelet
+pbc_pla1=pbc1%>%summarise(mean=mean(platelet),sd=sd(platelet))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_pla2=pbc1%>%group_by(trt)%>%summarise(mean=mean(platelet),sd=sd(platelet))
+pbc_pla=rbind(pbc_pla1,pbc_pla2)
+#protime
+pbc_pro1=pbc1%>%summarise(mean=mean(protime),sd=sd(protime))%>%mutate(trt="All")%>%dplyr::select(trt,mean,sd)
+pbc_pro2=pbc1%>%group_by(trt)%>%summarise(mean=mean(protime),sd=sd(protime))
+pbc_pro=rbind(pbc_pro1,pbc_pro2)
+pbc_num=bind_rows(pbc_age,pbc_bil,pbc_cho,pbc_alb,pbc_cop,pbc_alk,pbc_ast,pbc_tri,pbc_pla,pbc_pro)
+
+```
+
+```{r,eval=FALSE}
+pbc2=pbc%>%na.omit()%>%mutate(trt=if_else(trt==1,"D-penicillmain","placebo"),sex=if_else(sex=="f","female","male"),ascites=if_else(ascites==0,"no","yes"),hepato=if_else(hepato==0,"no","yes"),spiders=if_else(spiders==0,"no","yes"),edema=if_else(edema==0,"no edema & no diuretic therapy",if_else(edema==0.5,"edema without diuretic therapy or edema resolved by diuretic therapy","edema despite diuretic therapy")))
+p1= ggplot(data =pbc2,aes(x=age))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(age)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p2=ggplot(data =pbc2,aes(x=bili))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(bili)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p3=ggplot(data =pbc2,aes(x=chol))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(chol)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p4=ggplot(data =pbc2,aes(x=albumin))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(albumin)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p5=ggplot(data =pbc2,aes(x=copper))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(copper)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p6= ggplot(data =pbc2,aes(x=alk.phos))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(alk.phos)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p7=ggplot(data =pbc2,aes(x=ast))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(ast)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p8=ggplot(data =pbc2,aes(x=trig))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(trig)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p9=ggplot(data =pbc2,aes(x=platelet))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(platelet)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+p10=ggplot(data =pbc2,aes(x=protime))+
+  geom_density(color = "steelblue")+
+  geom_vline(aes(xintercept=mean(protime)),
+             color="steelblue", linetype="dashed", size=1)+
+  facet_wrap(~ trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  theme_classic()
+
+
+
+p11=ggplot(data = pbc2, aes(x = sex, fill = sex )) + 
+  geom_bar() +
+ geom_text(aes(label = ..count..), stat = "count",vjust=-.15,size=2.7)+
+  facet_wrap(~trt)+
+  theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+    xlab("sex")+
+    ylab("Count")+ 
+  theme(legend.position='right',text = element_text(size = 9)) + 
+  guides(fill=guide_legend(nrow=2, byrow=TRUE))
+
+p12=ggplot(data = pbc2, aes(x = ascites, fill = ascites )) + 
+  geom_bar() +
+ geom_text(aes(label = ..count..), stat = "count",vjust=-.15,size=2.7)+
+  facet_wrap(~trt)  +
+    theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+    xlab("ascite")+
+    ylab("Count")+ 
+  theme(legend.position='right',text = element_text(size = 9)) + 
+  guides(fill=guide_legend(nrow=2, byrow=TRUE))
+
+p13=ggplot(data = pbc2, aes(x = hepato, fill = hepato )) + 
+  geom_bar() +
+ geom_text(aes(label = ..count..), stat = "count",vjust=-.15,size=2.7)+
+  facet_wrap(~trt)  +
+    theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+    xlab("hepato")+
+    ylab("Count")+ 
+  theme(legend.position='right',text = element_text(size = 9)) + 
+  guides(fill=guide_legend(nrow=2, byrow=TRUE))
+
+p14=ggplot(data = pbc2, aes(x = spiders, fill = spiders )) + 
+  geom_bar() +
+ geom_text(aes(label = ..count..), stat = "count",vjust=-.15,size=2.7)+
+  facet_wrap(~trt)  +
+   theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+    xlab("spiders")+
+    ylab("Count")+ 
+  theme(legend.position='right',text = element_text(size = 9)) + 
+  guides(fill=guide_legend(nrow=2, byrow=TRUE))
+
+p15=ggplot(data = pbc2, aes(x = edema, fill = edema )) + 
+  geom_bar() +
+ geom_text(aes(label = ..count..), stat = "count",vjust=-.15,size=2.7)+
+  facet_wrap(~trt)  +
+    theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+  scale_x_discrete(labels=c("0", "0.5","1"))+
+    xlab("edema")+
+    ylab("Count")+ 
+  theme(legend.position='bottom',text = element_text(size = 9)) + 
+  guides(fill=guide_legend(nrow=2, byrow=TRUE))
+
+pbc2$stage=as.factor(pbc2$stage)
+p16=ggplot(data = pbc2, aes(x = stage, fill = stage )) + 
+  geom_bar() +
+ geom_text(aes(label = ..count..), stat = "count",vjust=-.15,size=2.7)+
+  facet_wrap(~trt)  +
+   theme(axis.text=element_text(size=9),axis.title=element_text(size=9,face="bold"))+
+    xlab("stage")+
+    ylab("Count")+ 
+  theme(legend.position='bottom',text = element_text(size = 9)) + 
+  guides(fill=guide_legend(nrow=1, byrow=TRUE))
+
+```
+
+```{r eval=FALSE}
+#test(var equal or not then t test)
+# numer
+f.test.age=var.test(age~trt,pbc1) #0.1839
+t.test.age=t.test(age~trt,pbc1,var.equal=T) #0.03343
+
+f.test.bili=var.test(bili~trt,pbc1) #<0.05
+t.test.bili=t.test(bili~trt,pbc1,var.equal=F) #0.1779
+
+f.test.chol=var.test(chol~trt,pbc1)#0.03035
+t.test.chol=t.test(chol~trt,pbc1) #0.7187
+
+f.test.alb=var.test(albumin~trt,pbc1) #0.04534
+t.test.alb=t.test(albumin~trt,pbc1) #0.375
+
+f.test.cop=var.test(copper~trt,pbc1) #0.085
+t.test.cop=t.test(copper~trt,pbc1,var.equal=T) #0.6334
+
+f.test.alk=var.test(alk.phos~trt,pbc1) #0.8852
+t.test.alk=t.test(alk.phos~trt,pbc,var.equal=T) #0.7473
+
+f.test.ast=var.test(ast~trt,pbc1)#0.097
+t.test.ast=t.test(ast~trt,pbc1,var.equal=T) #0.5007
+
+f.test.trig=var.test(trig~trt,pbc1) #0.02166
+t.test.trig=t.test(trig~trt,pbc1) #0.7691
+
+f.test.pla=var.test(platelet~trt,pbc1) #0.243
+t.test.pla=t.test(platelet~trt,pbc1,var.equal=T) #0.5149
+
+f.test.pro=var.test(protime~trt,pbc1) #0.0006784
+t.test.pro=t.test(protime~trt,pbc1) #0.2394
+
+
+Oij1=table(pbc2$sex,pbc2$trt)
+Oij1
+Eij1=outer(rowSums(Oij1),colSums(Oij1)/sum(Oij1))
+addmargins(Oij1)
+chisq.test(Oij1,y=NULL,correct = FALSE) #0.2343
+
+Oij2=table(pbc2$ascites,pbc2$trt)
+Oij2
+Eij2=outer(rowSums(Oij2),colSums(Oij2)/sum(Oij2))
+addmargins(Oij2)
+chisq.test(Oij2,y=NULL,correct = FALSE) #0.4361
+
+Oij3=table(pbc2$hepato,pbc2$trt)
+Oij3
+Eij3=outer(rowSums(Oij3),colSums(Oij3)/sum(Oij3))
+addmargins(Oij3)
+chisq.test(Oij3,y=NULL,correct = FALSE) #0.1503
+
+Oij4=table(pbc2$spiders,pbc2$trt)
+Oij4
+Eij4=outer(rowSums(Oij4),colSums(Oij4)/sum(Oij4))
+addmargins(Oij4)
+chisq.test(Oij4,y=NULL,correct = FALSE) #0.8777
+
+Oij5=table(pbc2$edema,pbc2$trt)
+Oij5
+Eij5=outer(rowSums(Oij5),colSums(Oij5)/sum(Oij5))
+addmargins(Oij5)
+chisq.test(Oij5,y=NULL,correct = FALSE) #0.4896
+
+Oij6=table(pbc2$stage,pbc2$trt)
+Oij6
+Eij6=outer(rowSums(Oij6),colSums(Oij6)/sum(Oij6))
+addmargins(Oij6)
+chisq.test(Oij6,y=NULL,correct = FALSE) #0.262
+
+#re-code status
+pbc3=pbc%>%na.omit%>%mutate(status=if_else(status==2,1,0))
+write.table(pbc3,"pbc3.txt",row.names = F,sep = "\t")
+
+
+```
+
+```{r eval=FALSE}
+### cox regression (selection)
+pbc3$sex=as.factor(pbc3$sex)
+pbc3$ascites=as.factor(pbc3$ascites)
+pbc3$hepato=as.factor(pbc3$hepato)
+pbc3$spiders=as.factor(pbc3$spiders)
+pbc3$edema=as.factor(pbc3$edema)
+pbc3$stage=as.factor(pbc3$stage)
+
+fit=coxph(Surv(time,status)~trt+age+sex+ascites+hepato+spiders+edema+bili+chol+albumin+copper+alk.phos+ast+trig+platelet+protime+stage,data = pbc3)
+fit0=coxph(Surv(time,status)~trt,data=pbc3)
+fita=stepAIC(fit0,scope = formula(fit),direction = "forward",k=2)
+summary(fita)
+```
+
+```{r eval=FALSE}
+# plot for stratified cox model
+pbc4=pbc3%>%mutate(bili1=if_else(bili<=0.9,"Low",if_else(bili<=2.8,"Median","High")))
+fit_st=coxph(Surv(time,status)~trt+stage+copper+albumin+protime+age+edema+ast+strata(bili1),data = pbc4)
+summary(fit_st)
+p17=ggsurvplot(survfit(fit_st),data=pbc4,conf.int = TRUE)
+```
+
